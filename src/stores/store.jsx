@@ -439,11 +439,10 @@ class Store {
 
     return {
       index: filteredCoins.indexOf(coinAddress),
-      erc20address: coinAddress,
-      symbol: symbol0,
+      erc20address: coinAddress,     symbol: symbol0,
       decimals: decimals0,
       name: name0,
-      balance: parseFloat(balance0)
+      balance: balance0
     }
   }, {
     promise: true,
@@ -559,7 +558,7 @@ class Store {
           name: name,
           balance: balance.toString(),
           isPoolSeeded,
-          id: symbol,
+          id: `${symbol}-${pool.version}`,
           assets: assets,
           basePool: basePool
         })
@@ -890,7 +889,7 @@ class Store {
         symbol: symbol,
         decimals: decimals,
         name: name,
-        balance: parseFloat(balance)
+        balance: balance
       }
 
       emitter.emit(GET_ASSET_INFO_RETURNED, returnObj)
@@ -1061,18 +1060,15 @@ class Store {
 
   _getGasPrice = async () => {
     try {
-      const url = 'https://gasprice.poa.network/'
-      const priceString = await rp(url)
-      const priceJSON = JSON.parse(priceString)
-      if(priceJSON) {
-        return priceJSON.fast.toFixed(0)
-      }
-      return store.getStore('universalGasPrice')
-    } catch(e) {
-      console.log(e)
-      return store.getStore('universalGasPrice')
+      const web3 = await this._getWeb3Provider();
+      const gasPrice = await web3.eth.getGasPrice();
+      const gasPriceInGwei = web3.utils.fromWei(gasPrice, "gwei");
+      return gasPriceInGwei;
+    } catch (e) {
+      console.log(e);
+      return store.getStore("universalGasPrice");
     }
-  }
+  };
 
   _getWeb3Provider = async () => {
     const web3context = store.getStore('web3context')

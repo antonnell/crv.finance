@@ -235,7 +235,7 @@ class Liquidity extends Component {
     this.state = {
       account: account,
       pools: pools,
-      pool: selectedPool ? selectedPool.symbol : '',
+      pool: selectedPool ? selectedPool.id : '',
       selectedPool: selectedPool,
       poolAmount: '',
       poolAmountError: '',
@@ -285,7 +285,7 @@ class Liquidity extends Component {
     const newStateSlice = {
       account: store.getStore('account'),
       pools: pools,
-      pool: selectedPool ? selectedPool.symbol : '',
+      pool: selectedPool ? selectedPool.id : '',
       selectedPool,
       loading: false,
       ...this.getStateSliceUserBalancesForSelectedPool(selectedPool),
@@ -342,7 +342,7 @@ class Liquidity extends Component {
 
     this.setState({
       pools: pools,
-      pool: pools && pools.length > 0 ? pools[0].symbol : '',
+      pool: pools && pools.length > 0 ? pools[0].id : '',
     })
   };
 
@@ -414,7 +414,7 @@ class Liquidity extends Component {
             <Typography variant='h4'>pool</Typography>
           </div>
           <div className={ classes.balances }>
-            { (selectedPool ? (<Typography variant='h4' onClick={ () => { this.setAmount('pool', (selectedPool ? floatToFixed(selectedPool.balance, selectedPool.decimals) : '0')) } } className={ classes.value } noWrap>{ ''+ ( selectedPool && selectedPool.balance ? floatToFixed(selectedPool.balance, 4) : '0.0000') } { selectedPool ? selectedPool.symbol : '' }</Typography>) : <Typography variant='h4' className={ classes.value } noWrap>Balance: -</Typography>) }
+            { (selectedPool ? (<Typography variant='h4' onClick={ () => { this.setAmount('pool', (selectedPool ? floatToFixed(selectedPool.balance, selectedPool.decimals) : '0')) } } className={ classes.value } noWrap>{ ''+ ( selectedPool && selectedPool.balance ? floatToFixed(selectedPool.balance, 4) : '0.0000') } { selectedPool ? selectedPool.id : '' }</Typography>) : <Typography variant='h4' className={ classes.value } noWrap>Balance: -</Typography>) }
           </div>
         </div>
         <div>
@@ -596,7 +596,8 @@ class Liquidity extends Component {
       slippagePcent,
       selectedPool
     } = this.state
-
+    let amount = depositAmount;
+    if (!depositAmount) amount = 0.00
     if (selectedPool && !selectedPool.isPoolSeeded) return null;
 
     return (
@@ -802,7 +803,7 @@ class Liquidity extends Component {
 
       this.setState({
         selectedPool: selectedPool,
-        pool: selectedPool ? selectedPool.symbol : ''
+        pool: selectedPool ? selectedPool.id : ''
       })
 
       if(!selectedPool) {
@@ -835,7 +836,7 @@ class Liquidity extends Component {
 
     if(!selectedPool) {
       selectedPool = pools[0]
-      pool = pools[0].symbol
+      pool = pools[0].id
 
       this.setState({
         selectedPool: selectedPool,
