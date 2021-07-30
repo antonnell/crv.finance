@@ -295,6 +295,10 @@ class AddPool extends Component {
       assetType: selectedAssetType ? selectedAssetType.index : '',
       selectedAssetType: selectedAssetType,
       assetTypeError: false,
+      fee: '0.0004',
+      feeError: false,
+      a: '10',
+      aError: false
     }
   }
   componentWillMount() {
@@ -387,14 +391,16 @@ class AddPool extends Component {
           { this.renderPoolTypeSelect() }
           { this.renderInput('name') }
           { this.renderInput('symbol') }
+          { this.renderInput('fee', 'fee (%)') }
+          { this.renderInput('a') }
           {
             poolType === 'Plain' &&
             <>
               { this.renderAssetTypeSelect() }
-              { this.renderAddressInput('tokenAddress0') }
-              { this.renderAddressInput('tokenAddress1') }
-              { this.renderAddressInput('tokenAddress2') }
-              { this.renderAddressInput('tokenAddress3') }
+              { this.renderAddressInput('tokenAddress0', 'token 1 address') }
+              { this.renderAddressInput('tokenAddress1', 'token 2 address') }
+              { this.renderAddressInput('tokenAddress2', 'token 3 address') }
+              { this.renderAddressInput('tokenAddress3', 'token 4 address') }
             </>
           }
           {
@@ -422,7 +428,7 @@ class AddPool extends Component {
     )
   };
 
-  renderInput = (id) => {
+  renderInput = (id, overrideLabel) => {
     const { loading } = this.state
     const { classes } = this.props
 
@@ -430,7 +436,7 @@ class AddPool extends Component {
       <div className={ classes.valContainer }>
         <div className={ classes.flexy }>
           <div className={ classes.label }>
-            <Typography variant='h4'>{id}</Typography>
+            <Typography variant='h4'>{ overrideLabel ? overrideLabel : id}</Typography>
           </div>
           <div className={ classes.balances }>
           </div>
@@ -452,7 +458,7 @@ class AddPool extends Component {
     )
   }
 
-  renderAddressInput = (id) => {
+  renderAddressInput = (id, overrideLabel) => {
     const { loading, assetType } = this.state
     const { classes } = this.props
 
@@ -460,7 +466,7 @@ class AddPool extends Component {
       <div className={ classes.valContainer }>
         <div className={ classes.flexy }>
           <div className={ classes.label }>
-            <Typography variant='h4'>token address</Typography>
+            <Typography variant='h4'>{ overrideLabel ? overrideLabel : 'token address' }</Typography>
           </div>
           <div className={ classes.balances }>
           </div>
@@ -932,7 +938,9 @@ class AddPool extends Component {
       tokenAddressError1: false,
       tokenAddressError2: false,
       tokenAddressError3: false,
-      selectedBasePoolError: false
+      selectedBasePoolError: false,
+      feeError: false,
+      aError: false
     })
 
     const {
@@ -946,7 +954,9 @@ class AddPool extends Component {
       name,
       symbol,
       selectedImplementation,
-      assetType
+      assetType,
+      fee,
+      a
     } = this.state
     let error = false
 
@@ -957,6 +967,16 @@ class AddPool extends Component {
 
     if(!symbol || symbol === '') {
       this.setState({ symbolError: true })
+      error = true
+    }
+
+    if(!fee || fee === '') {
+      this.setState({ feeError: true })
+      error = true
+    }
+
+    if(!a || a === '') {
+      this.setState({ aError: true })
       error = true
     }
 
@@ -989,7 +1009,7 @@ class AddPool extends Component {
 
     if(!error) {
       this.setState({ loading: true })
-      dispatcher.dispatch({ type: ADD_POOL, content: { poolType, basePool: selectedBasePool, address: tokenAddress, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex: selectedImplementation.index, assetType: assetType } })
+      dispatcher.dispatch({ type: ADD_POOL, content: { poolType, basePool: selectedBasePool, address: tokenAddress, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex: selectedImplementation.index, assetType: assetType, fee, a } })
     }
   }
 }

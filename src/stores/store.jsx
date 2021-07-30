@@ -902,12 +902,14 @@ class Store {
 
   addPool = async (payload) => {
     try {
-      const { poolType, basePool, address, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType } = payload.content
+      const { poolType, basePool, address, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType, fee, a } = payload.content
       const account = store.getStore('account')
       const web3 = await this._getWeb3Provider()
 
+      let theFee = BigNumber(fee).times(10**10).toFixed(0)
+
       if(poolType === 'Metapool') {
-        this._callDeployMetapool(web3, account, basePool, address, name, symbol, implementationIndex, (err, a) => {
+        this._callDeployMetapool(web3, account, basePool, address, name, symbol, implementationIndex, theFee, a,(err, a) => {
           if(err) {
             emitter.emit(ERROR, err)
             return emitter.emit(SNACKBAR_ERROR, err)
@@ -916,7 +918,7 @@ class Store {
           emitter.emit(ADD_POOL_RETURNED)
         })
       } else {
-        this._callDeployPlainpool(web3, account, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType, (err, a) => {
+        this._callDeployPlainpool(web3, account, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType,  theFee, a, (err, a) => {
           if(err) {
             emitter.emit(ERROR, err)
             return emitter.emit(SNACKBAR_ERROR, err)
@@ -934,7 +936,7 @@ class Store {
     }
   }
 
-  _callDeployPlainpool = async (web3, account, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType, callback) => {
+  _callDeployPlainpool = async (web3, account, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType, fee, a, callback) => {
     const curveFactoryContract = new web3.eth.Contract(config.curveFactoryV3ABI, config.curveFactoryV3Address)
 
     const tokens = []
@@ -959,7 +961,7 @@ class Store {
       tokens.push(ZERO_ADDRESS)
     }
 
-    curveFactoryContract.methods.deploy_plain_pool(name, symbol, tokens, '10', '4000000', assetType, implementationIndex).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    curveFactoryContract.methods.deploy_plain_pool(name, symbol, tokens, a, fee, assetType, implementationIndex).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
@@ -979,10 +981,10 @@ class Store {
     })
   }
 
-  _callDeployMetapool = async (web3, account, basePool, address, name, symbol, implementationIndex, callback) => {
+  _callDeployMetapool = async (web3, account, basePool, address, name, symbol, implementationIndex,  fee, a, callback) => {
     const curveFactoryContract = new web3.eth.Contract(config.curveFactoryV3ABI, config.curveFactoryV3Address)
 
-    curveFactoryContract.methods.deploy_metapool(basePool.erc20address, name, symbol, address, '10', '4000000', implementationIndex).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    curveFactoryContract.methods.deploy_metapool(basePool.erc20address, name, symbol, address, a, fee, implementationIndex).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
