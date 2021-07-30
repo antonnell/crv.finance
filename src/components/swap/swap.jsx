@@ -15,6 +15,7 @@ import RateInfo from '../rateInfo'
 import UnderlyingAssetsInfo from './underlyingAssetsInfo'
 import PoolSeedingCTA from '../poolSeedingCTA'
 import { floatToFixed } from '../../utils/numbers'
+import BigNumber from 'bignumber.js'
 
 import {
   ERROR,
@@ -671,7 +672,7 @@ class Swap extends Component {
       return
     }
 
-    if(!fromAmount || isNaN(fromAmount) || fromAmount <= 0) {
+    if(!fromAmount || isNaN(fromAmount) || BigNumber(fromAmount).lte(0)) {
       return false
     }
 
@@ -698,7 +699,7 @@ class Swap extends Component {
       return asset.symbol === toAsset
     })[0]
 
-    if(!fromAmount || isNaN(fromAmount) || fromAmount <= 0 || fromAmount > from.balance) {
+    if(!fromAmount || isNaN(fromAmount) || BigNumber(fromAmount).lte(0) || BigNumber(fromAmount).gt(from.balance)) {
       this.setState({ fromAmountError: true })
       return false
     }

@@ -13,6 +13,7 @@ import { colors } from '../../theme'
 import Loader from '../loader'
 import SlippageInfo from '../slippageInfo'
 import { floatToFixed } from '../../utils/numbers'
+import BigNumber from 'bignumber.js'
 
 import {
   ERROR,
@@ -883,7 +884,7 @@ class Liquidity extends Component {
       selectedPool
     } = this.state
 
-    if(!poolAmount || isNaN(poolAmount) || poolAmount <= 0 || poolAmount > selectedPool.balance) {
+    if(!poolAmount || isNaN(poolAmount) || BigNumber(poolAmount).lte(0) || BigNumber(poolAmount).gt(selectedPool.balance)) {
       this.setState({ poolAmountError: true })
       return false
     }
