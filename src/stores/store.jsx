@@ -146,6 +146,42 @@ class Store {
           ]
         }
       ],
+      implementations: [
+        {
+          index: 0,
+          description: 'Basic'
+        },
+        {
+          index: 1,
+          description: 'Balances'
+        },
+        {
+          index: 2,
+          description: 'Eth'
+        },
+        {
+          index: 3,
+          description: 'Optimized'
+        },
+      ],
+      assetTypes: [
+        {
+          index: 0,
+          description: 'USD'
+        },
+        {
+          index: 1,
+          description: 'ETH'
+        },
+        {
+          index: 2,
+          description: 'BTC'
+        },
+        {
+          index: 3,
+          description: 'Other'
+        },
+      ],
       connectorsByName: {
         MetaMask: injected,
         TrustWallet: injected,
@@ -215,7 +251,6 @@ class Store {
 
   _checkApproval2 = async (asset, account, amount, contract) => {
     try {
-      console.log(asset)
       const web3 = await this._getWeb3Provider()
       const erc20Contract = new web3.eth.Contract(config.erc20ABI, asset.erc20address)
       const allowance = await erc20Contract.methods.allowance(account.address, contract).call({ from: account.address })
@@ -275,7 +310,6 @@ class Store {
 
   configure = async () => {
     const account = store.getStore('account')
-
     if(!account || !account.address) {
       return false
     }
@@ -283,7 +317,11 @@ class Store {
     const web3 = await this._getWeb3Provider()
     let poolsV1 = await this._getPools(web3)
     let poolsV2 = await this._getPoolsV2(web3)
+    let poolsV3 = await this._getPoolsV3(web3)
 
+    if(!poolsV3) {
+      poolsV3 = []
+    }
     if(!poolsV2) {
       poolsV2 = []
     }
@@ -291,7 +329,7 @@ class Store {
       poolsV1 = []
     }
 
-    const pools = [...poolsV2, ...poolsV1]
+    const pools = [...poolsV3, ...poolsV2, ...poolsV1]
 
     async.map(pools, (pool, callback) => {
       this._getPoolData(web3, pool, account, callback)
@@ -301,8 +339,6 @@ class Store {
         return emitter.emit(SNACKBAR_ERROR, err)
       }
 
-      console.log(poolData)
-
       store.setStore({ pools: poolData })
       return emitter.emit(CONFIGURE_RETURNED)
     })
@@ -311,9 +347,7 @@ class Store {
   _getPools = async (web3) => {
     try {
       const curveFactoryContract = new web3.eth.Contract(config.curveFactoryABI, config.curveFactoryAddress)
-
       const poolCount = await curveFactoryContract.methods.pool_count().call()
-
       const pools = await Promise.all([...Array(parseInt(poolCount)).keys()].map(
         i => curveFactoryContract.methods.pool_list(i).call()
       ))
@@ -326,6 +360,7 @@ class Store {
         }
       })
     } catch (ex) {
+      console.log(ex)
       emitter.emit(ERROR, ex)
       emitter.emit(SNACKBAR_ERROR, ex)
     }
@@ -344,6 +379,28 @@ class Store {
       return pools.map((poolAddress) => {
         return {
           version: 2,
+          address: poolAddress
+        }
+      })
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  _getPoolsV3 = async (web3) => {
+    try {
+      const curveFactoryContract = new web3.eth.Contract(config.curveFactoryV3ABI, config.curveFactoryV3Address)
+
+      const poolCount = await curveFactoryContract.methods.pool_count().call()
+
+      const pools = await Promise.all([...Array(parseInt(poolCount)).keys()].map(
+        i => curveFactoryContract.methods.pool_list(i).call()
+      ))
+
+      return pools.map((poolAddress) => {
+        return {
+          version: 3,
           address: poolAddress
         }
       })
@@ -412,13 +469,33 @@ class Store {
       let curveFactoryContract = null
       if(pool.version === 1) {
         curveFactoryContract = new web3.eth.Contract(config.curveFactoryABI, config.curveFactoryAddress)
-      } else {
+      } else if(pool.version === 2) {
         curveFactoryContract = new web3.eth.Contract(config.curveFactoryV2ABI, config.curveFactoryV2Address)
+      } else {
+        curveFactoryContract = new web3.eth.Contract(config.curveFactoryV3ABI, config.curveFactoryV3Address)
       }
+
+
       const poolBalances = await curveFactoryContract.methods.get_balances(pool.address).call()
       const isPoolSeeded = sumArray(poolBalances) !== 0
 
-      let coins = await curveFactoryContract.methods.get_underlying_coins(pool.address).call()
+      let coins = null
+      let basePool = null
+
+      // get_base_pool for version 3
+      // if no base pool, use //get_coins not get_underlying_coins later on use get_dy not get_dy_underlying
+      if(pool.version === 3) {
+        basePool = await curveFactoryContract.methods.get_base_pool(pool.address).call()
+
+        if(basePool !== ZERO_ADDRESS) {
+          coins = await curveFactoryContract.methods.get_underlying_coins(pool.address).call()
+        } else {
+          coins = await curveFactoryContract.methods.get_coins(pool.address).call()
+        }
+      } else {
+        coins = await curveFactoryContract.methods.get_underlying_coins(pool.address).call()
+      }
+
 
       let filteredCoins = coins.filter((coin) => {
         return coin !== ZERO_ADDRESS
@@ -457,17 +534,21 @@ class Store {
         let liquidityAddress = ''
         let liquidityABI = ''
 
-        const basePools = store.getStore('basePools')
-
-        console.log(assets);
-
-        if(assets[1].erc20address.toLowerCase() === '0x6B175474E89094C44Da98b954EedeAC495271d0F'.toLowerCase()) {
-          liquidityAddress = config.usdDepositerAddress
-          liquidityABI = config.usdDepositerABI
+        if(pool.version === 3 && basePool === ZERO_ADDRESS) { //add liquidity directly on the contract for these ones.
+          liquidityAddress = pool.address
+          liquidityABI = config.plainpoolABI
         } else {
-          liquidityAddress = config.btcDepositerAddress
-          liquidityABI = config.btcDepositerABI
+          if(assets[1].erc20address.toLowerCase() === '0x6B175474E89094C44Da98b954EedeAC495271d0F'.toLowerCase()) {
+            liquidityAddress = config.usdDepositerAddress
+            liquidityABI = config.usdDepositerABI
+          } else {
+            liquidityAddress = config.btcDepositerAddress
+            liquidityABI = config.btcDepositerABI
+          }
+
         }
+
+
         callback(null, {
           version: pool.version,
           address: pool.address,
@@ -479,10 +560,12 @@ class Store {
           balance: balance.toString(),
           isPoolSeeded,
           id: symbol,
-          assets: assets
+          assets: assets,
+          basePool: basePool
         })
       })
     } catch(ex) {
+      console.log(pool)
       console.log(ex)
       return callback(ex)
     }
@@ -498,8 +581,6 @@ class Store {
         (asset, index) => { return this._checkApproval2(asset, account, amounts[index], pool.liquidityAddress) }
       ))
 
-      console.log(approvals)
-
       const amountsBN = amounts.map((amount, index) => {
 
         let amountToSend = web3.utils.toWei(amount, "ether")
@@ -514,8 +595,6 @@ class Store {
 
         return amountToSend
       })
-
-      console.log(amountsBN)
 
       this._callAddLiquidity(web3, account, pool, amountsBN, (err, a) => {
         if(err) {
@@ -535,10 +614,18 @@ class Store {
   _callAddLiquidity = async (web3, account, pool, amounts, callback) => {
     const metapoolContract = new web3.eth.Contract(pool.liquidityABI, pool.liquidityAddress)
 
-    console.log(pool.liquidityAddress)
     let receive = '0'
     try {
-      const amountToReceive = await metapoolContract.methods.calc_token_amount(pool.address, amounts, true).call()
+
+      let calc_token_amount = null
+
+      if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+        calc_token_amount = metapoolContract.methods.calc_token_amount(amounts, true)
+      } else {
+        calc_token_amount = metapoolContract.methods.calc_token_amount(pool.address, amounts, true)
+      }
+
+      const amountToReceive = await calc_token_amount.call()
       receive = new BigNumber(amountToReceive)
         .times(95)
         .dividedBy(100)
@@ -550,7 +637,6 @@ class Store {
       // if not 0, we throw an exception because it shouldn't be.
       const tokenContract = new web3.eth.Contract(config.erc20ABI, pool.address)
       const totalSupply = await tokenContract.methods.totalSupply().call()
-      console.log(totalSupply)
       if(totalSupply == 0) {
         receive = '0'
       } else {
@@ -558,9 +644,15 @@ class Store {
       }
     }
 
-    console.log(pool.address, amounts, receive)
+    let params = []
 
-    metapoolContract.methods.add_liquidity(pool.address, amounts, receive).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+      params = [amounts, receive]
+    } else {
+      params = [pool.address, amounts, receive]
+    }
+
+    metapoolContract.methods.add_liquidity(...params).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
@@ -596,10 +688,7 @@ class Store {
           .toFixed(0)
       }
 
-      console.log(pool);
-
       await this._checkApproval2({erc20address:pool.address, decimals:18}, account, amountToSend, pool.liquidityAddress)
-
 
       this._callRemoveLiquidity(web3, account, pool, amountToSend, (err, a) => {
         if(err) {
@@ -622,7 +711,16 @@ class Store {
 
     //calcualte minimum amounts ?
 
-    metapoolContract.methods.remove_liquidity(pool.address, amountToSend, [0, 0, 0, 0]).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+
+    let params = []
+
+    if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+      params = [amountToSend, [0, 0]]
+    } else {
+      params = [pool.address, amountToSend, [0, 0, 0, 0]]
+    }
+
+    metapoolContract.methods.remove_liquidity(...params).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
@@ -659,7 +757,13 @@ class Store {
       }
 
       const metapoolContract = new web3.eth.Contract(config.metapoolABI, pool.address)
-      const amountToReceive = await metapoolContract.methods.get_dy_underlying(from.index, to.index, amountToSend).call()
+      let amountToReceive = 0
+
+      if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+        amountToReceive = await metapoolContract.methods.get_dy(from.index, to.index, amountToSend).call()
+      } else {
+        amountToReceive = await metapoolContract.methods.get_dy_underlying(from.index, to.index, amountToSend).call()
+      }
 
       const receiveAmount = amountToReceive/10**to.decimals
 
@@ -701,7 +805,13 @@ class Store {
         }
 
         const metapoolContract = new web3.eth.Contract(config.metapoolABI, pool.address)
-        const amountToReceive = await metapoolContract.methods.get_dy_underlying(from.index, to.index, amountToSend).call()
+        let amountToReceive = 0
+
+        if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+          amountToReceive = await metapoolContract.methods.get_dy(from.index, to.index, amountToSend).call()
+        } else {
+          amountToReceive = await metapoolContract.methods.get_dy_underlying(from.index, to.index, amountToSend).call()
+        }
 
         this._callExchange(web3, account, from, to, pool, amountToSend, amountToReceive, (err, a) => {
           if(err) {
@@ -727,7 +837,15 @@ class Store {
       .dividedBy(100)
       .toFixed(0)
 
-    metapoolContract.methods.exchange_underlying(from.index, to.index, amountToSend, receive).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    let exchangeCall = null
+
+    if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+      exchangeCall = metapoolContract.methods.exchange
+    } else {
+      exchangeCall = metapoolContract.methods.exchange_underlying
+    }
+
+    exchangeCall(from.index, to.index, amountToSend, receive).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
@@ -785,18 +903,31 @@ class Store {
 
   addPool = async (payload) => {
     try {
-      const { basePool, address,  name, symbol, a, fee } = payload.content
+      const { poolType, basePool, address, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType } = payload.content
       const account = store.getStore('account')
       const web3 = await this._getWeb3Provider()
 
-      this._callDeployMetapool(web3, account, basePool, address, name, symbol, a, fee, (err, a) => {
-        if(err) {
-          emitter.emit(ERROR, err)
-          return emitter.emit(SNACKBAR_ERROR, err)
-        }
+      if(poolType === 'Metapool') {
+        this._callDeployMetapool(web3, account, basePool, address, name, symbol, implementationIndex, (err, a) => {
+          if(err) {
+            emitter.emit(ERROR, err)
+            return emitter.emit(SNACKBAR_ERROR, err)
+          }
 
-        emitter.emit(ADD_POOL_RETURNED)
-      })
+          emitter.emit(ADD_POOL_RETURNED)
+        })
+      } else {
+        this._callDeployPlainpool(web3, account, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType, (err, a) => {
+          if(err) {
+            emitter.emit(ERROR, err)
+            return emitter.emit(SNACKBAR_ERROR, err)
+          }
+
+          emitter.emit(ADD_POOL_RETURNED)
+        })
+      }
+
+
 
     } catch (ex) {
       emitter.emit(ERROR, ex)
@@ -804,10 +935,55 @@ class Store {
     }
   }
 
-  _callDeployMetapool = async (web3, account, basePool, address, name, symbol, a, fee, callback) => {
-    const curveFactoryContract = new web3.eth.Contract(config.curveFactoryV2ABI, config.curveFactoryV2Address)
+  _callDeployPlainpool = async (web3, account, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex, assetType, callback) => {
+    const curveFactoryContract = new web3.eth.Contract(config.curveFactoryV3ABI, config.curveFactoryV3Address)
 
-    curveFactoryContract.methods.deploy_metapool(basePool.erc20address, name, symbol, address, '10', '4000000').send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    const tokens = []
+    if(tokenAddress0 && tokenAddress0 !== '') {
+      tokens.push(tokenAddress0)
+    } else {
+      tokens.push(ZERO_ADDRESS)
+    }
+    if(tokenAddress1 && tokenAddress1 !== '') {
+      tokens.push(tokenAddress1)
+    } else {
+      tokens.push(ZERO_ADDRESS)
+    }
+    if(tokenAddress2 && tokenAddress2 !== '') {
+      tokens.push(tokenAddress2)
+    } else {
+      tokens.push(ZERO_ADDRESS)
+    }
+    if(tokenAddress3 && tokenAddress3 !== '') {
+      tokens.push(tokenAddress3)
+    } else {
+      tokens.push(ZERO_ADDRESS)
+    }
+
+    curveFactoryContract.methods.deploy_plain_pool(name, symbol, tokens, '10', '4000000', assetType, implementationIndex).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    .on('transactionHash', function(hash){
+      emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
+      callback(null, hash)
+    })
+    .on('confirmation', function(confirmationNumber, receipt){
+      if(confirmationNumber === 1) {
+        dispatcher.dispatch({ type: CONFIGURE, content: {} })
+      }
+    })
+    .on('receipt', function(receipt){
+    })
+    .on('error', function(error) {
+      if(error.message) {
+        return callback(error.message)
+      }
+      callback(error)
+    })
+  }
+
+  _callDeployMetapool = async (web3, account, basePool, address, name, symbol, implementationIndex, callback) => {
+    const curveFactoryContract = new web3.eth.Contract(config.curveFactoryV3ABI, config.curveFactoryV3Address)
+
+    curveFactoryContract.methods.deploy_metapool(basePool.erc20address, name, symbol, address, '10', '4000000', implementationIndex).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
@@ -849,8 +1025,16 @@ class Store {
       const zapContract = new web3.eth.Contract(pool.liquidityABI, pool.liquidityAddress)
       const poolContract = new web3.eth.Contract(config.metapoolABI, pool.address)
 
+      let calc_token_amount = null
+
+      if(pool.version === 3 && pool.basePool === ZERO_ADDRESS) {
+        calc_token_amount = zapContract.methods.calc_token_amount(amountsBN, true)
+      } else {
+        calc_token_amount = zapContract.methods.calc_token_amount(pool.address, amountsBN, true)
+      }
+
       const [receiveAmountBn, virtPriceBn] = await Promise.all([
-        zapContract.methods.calc_token_amount(pool.address, amountsBN, true).call(),
+        calc_token_amount.call(),
         poolContract.methods.get_virtual_price().call(),
       ])
 

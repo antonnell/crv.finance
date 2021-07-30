@@ -450,7 +450,7 @@ class Swap extends Component {
     const { classes } = this.props
 
     return (
-      <MenuItem key={option.id} value={option.symbol} className={ classes.assetSelectMenu }>
+      <MenuItem key={option.address} value={option.symbol} className={ classes.assetSelectMenu }>
         <div className={ classes.poolSelectOption }>
           <Typography variant='h4'>{ option.name }</Typography>
           <Typography variant='h5' className={`${ option.version === 1 ? classes.version1 : classes.version2 }`}>version { option.version }</Typography>

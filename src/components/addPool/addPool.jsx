@@ -18,7 +18,8 @@ import {
   GET_ASSET_INFO,
   GET_ASSET_INFO_RETURNED,
   ADD_POOL,
-  ADD_POOL_RETURNED
+  ADD_POOL_RETURNED,
+  EEEEE_ADDRESS
 } from '../../constants'
 
 import Store from "../../stores";
@@ -149,7 +150,7 @@ const styles = theme => ({
     flex: 1,
     cursor: 'pointer',
     display: 'flex',
-    alignItems: 'center',
+  alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: '24px',
     color: colors.text
@@ -261,13 +262,18 @@ class AddPool extends Component {
     const account = store.getStore('account')
     const pools = store.getStore('pools')
     const basePools = store.getStore('basePools')
+    const implementations = store.getStore('implementations')
+    const assetTypes = store.getStore('assetTypes')
 
     const selectedBasePool = basePools && basePools.length > 0 ? basePools[0] : null
+    const selectedImplementation = implementations && implementations.length > 0 ? implementations[0] : null
+    const selectedAssetType = assetTypes && assetTypes.length > 0 ? assetTypes[0] : null
 
     this.state = {
       account: store.getStore('account'),
       assetInfo: null,
       basePools: basePools,
+      implementations: implementations,
       basePool: selectedBasePool ? selectedBasePool.name : '',
       selectedBasePool: selectedBasePool,
       tokenAddress: '',
@@ -276,11 +282,19 @@ class AddPool extends Component {
       nameError: false,
       symbol: '',
       symbolError: false,
-      a: '100',
-      aError: false,
-      fee: '4000000',
-      feeError: false,
+      implementation: selectedImplementation ? selectedImplementation.index : '',
+      selectedImplementation: selectedImplementation,
+      implementationError: false,
       loading: !(pools && pools.length > 0 && pools[0].assets.length > 0),
+      poolTypes: [
+        'Plain',
+        'Metapool'
+      ],
+      poolType: 'Plain',
+      assetTypes: assetTypes,
+      assetType: selectedAssetType ? selectedAssetType.index : '',
+      selectedAssetType: selectedAssetType,
+      assetTypeError: false,
     }
   }
   componentWillMount() {
@@ -312,10 +326,33 @@ class AddPool extends Component {
   }
 
   getAssetInfoReturned = (assetInfo) => {
-    this.setState({
-      assetInfo: assetInfo,
-      loading: false
-    })
+
+    if(this.state.tokenAddress === assetInfo.address) {
+      this.setState({
+        assetInfo: assetInfo,
+        loading: false
+      })
+    } else if(this.state.tokenAddress0 === assetInfo.address) {
+      this.setState({
+        assetInfo0: assetInfo,
+        loading: false
+      })
+    }  else if(this.state.tokenAddress1 === assetInfo.address) {
+        this.setState({
+          assetInfo1: assetInfo,
+          loading: false
+        })
+    }  else if(this.state.tokenAddress2 === assetInfo.address) {
+        this.setState({
+          assetInfo2: assetInfo,
+          loading: false
+        })
+    }  else if(this.state.tokenAddress3 === assetInfo.address) {
+        this.setState({
+          assetInfo3: assetInfo,
+          loading: false
+        })
+    }
   }
 
   addPoolReturned = () => {
@@ -333,6 +370,7 @@ class AddPool extends Component {
     const {
       loading,
       account,
+      poolType
     } = this.state
 
     if(!account || !account.address) {
@@ -346,10 +384,27 @@ class AddPool extends Component {
           <Alert icon={false} className={classes.infoAlert}>
             Note: The factory does not support tokens with transfer fees.<br /><a href="https://curve.readthedocs.io/factory-deployer.html#limitations" target="_blank" rel="noopener noreferrer">Read all expected behaviors and limitations</a>
           </Alert>
+          { this.renderPoolTypeSelect() }
           { this.renderInput('name') }
           { this.renderInput('symbol') }
-          { this.renderAddressInput() }
-          { this.renderBasePoolSelect() }
+          {
+            poolType === 'Plain' &&
+            <>
+              { this.renderAssetTypeSelect() }
+              { this.renderAddressInput('tokenAddress0') }
+              { this.renderAddressInput('tokenAddress1') }
+              { this.renderAddressInput('tokenAddress2') }
+              { this.renderAddressInput('tokenAddress3') }
+            </>
+          }
+          {
+            poolType === 'Metapool' &&
+            <>
+              { this.renderAddressInput('tokenAddress') }
+              { this.renderBasePoolSelect() }
+            </>
+          }
+          { this.renderImplementationSelect() }
           { this.renderAssetInfo() }
           <Button
             className={ classes.actionButton }
@@ -385,6 +440,7 @@ class AddPool extends Component {
             id={ id }
             name={ id }
             value={ this.state[id] }
+            error={ this.state[id+'Error'] }
             onChange={ this.onChange }
             fullWidth
             variant="outlined"
@@ -396,8 +452,8 @@ class AddPool extends Component {
     )
   }
 
-  renderAddressInput = () => {
-    const { loading, tokenAddress } = this.state
+  renderAddressInput = (id) => {
+    const { loading, assetType } = this.state
     const { classes } = this.props
 
     return (
@@ -411,13 +467,14 @@ class AddPool extends Component {
         </div>
         <div>
           <TextField
-            id={ 'tokenAddress' }
-            name={ 'tokenAddress' }
-            value={ tokenAddress }
+            id={ id }
+            name={ id }
+            value={ this.state[id] }
+            error={ this.state[id+'Error'] }
             onChange={ this.onAddressChange }
             fullWidth
             variant="outlined"
-            disabled={ loading }
+            disabled={ loading || (id === 'tokenAddress0' && assetType === 1 ) }
             className={ classes.actionInput }
           />
         </div>
@@ -480,8 +537,189 @@ class AddPool extends Component {
     )
   }
 
+  renderAssetTypeSelect = () => {
+    const { loading, assetTypes, assetType } = this.state
+    const { classes } = this.props
+
+    return (
+      <div className={ classes.valContainer }>
+        <div className={ classes.flexy }>
+          <div className={ classes.label }>
+            <Typography variant='h4'>asset type</Typography>
+          </div>
+          <div className={ classes.balances }>
+          </div>
+        </div>
+        <div>
+          <TextField
+            id={ 'assetType' }
+            name={ 'assetType' }
+            select
+            value={ assetType }
+            onChange={ this.onAssetTypeSelectChange }
+            SelectProps={{
+              native: false,
+              renderValue: (option) => {
+
+                let theImp = assetTypes ? assetTypes.filter((imp) => {
+                  return imp.index === option
+                }) : null
+
+                return (
+                  <div className={ classes.assetSelectIconName }>
+                    <Typography variant='h4'>{ theImp && theImp.length > 0 ? theImp[0].description : '' }</Typography>
+                  </div>
+                )
+              }
+            }}
+            fullWidth
+            variant="outlined"
+            disabled={ loading }
+            className={ classes.actionInput }
+            placeholder={ 'Select' }
+          >
+            { assetTypes ? assetTypes.map((imp) => { return this.renderAssetTypeOption(imp) }) : null }
+          </TextField>
+        </div>
+      </div>
+    )
+  }
+
+  renderAssetTypeOption = (option) => {
+    const { classes } = this.props
+
+    return (
+      <MenuItem key={option.index} value={option.index} className={ classes.assetSelectMenu }>
+        <div className={ classes.assetSelectIconName }>
+          <Typography variant='h4'>{ option.description }</Typography>
+        </div>
+      </MenuItem>
+    )
+  }
+
+  renderImplementationSelect = () => {
+    const { loading, implementations, implementation, poolType } = this.state
+    const { classes } = this.props
+
+    return (
+      <div className={ classes.valContainer }>
+        <div className={ classes.flexy }>
+          <div className={ classes.label }>
+            <Typography variant='h4'>implementation</Typography>
+          </div>
+          <div className={ classes.balances }>
+          </div>
+        </div>
+        <div>
+          <TextField
+            id={ 'implementation' }
+            name={ 'implementation' }
+            select
+            value={ implementation }
+            onChange={ this.onImplementationSelectChange }
+            SelectProps={{
+              native: false,
+              renderValue: (option) => {
+
+                let theImp = implementations.filter((imp) => {
+                  return imp.index === option
+                })
+
+                return (
+                  <div className={ classes.assetSelectIconName }>
+                    <Typography variant='h4'>{ theImp && theImp.length > 0 ? theImp[0].description : '' }</Typography>
+                  </div>
+                )
+              }
+            }}
+            fullWidth
+            variant="outlined"
+            disabled={ loading }
+            className={ classes.actionInput }
+            placeholder={ 'Select' }
+          >
+            { implementations ? implementations.filter((imp) => {
+              if(poolType === 'Metapool') {
+                return ['Basic', 'Balances'].includes(imp.description)
+              }
+
+              return true
+            }).map((imp) => { return this.renderImplementationOption(imp) }) : null }
+          </TextField>
+        </div>
+      </div>
+    )
+  }
+
+  renderImplementationOption = (option) => {
+    const { classes } = this.props
+
+    return (
+      <MenuItem key={option.index} value={option.index} className={ classes.assetSelectMenu }>
+        <div className={ classes.assetSelectIconName }>
+          <Typography variant='h4'>{ option.description }</Typography>
+        </div>
+      </MenuItem>
+    )
+  }
+
+  renderPoolTypeSelect = () => {
+    const { loading, poolTypes, poolType } = this.state
+    const { classes } = this.props
+
+    return (
+      <div className={ classes.valContainer }>
+        <div className={ classes.flexy }>
+          <div className={ classes.label }>
+            <Typography variant='h4'>pool type</Typography>
+          </div>
+          <div className={ classes.balances }>
+          </div>
+        </div>
+        <div>
+          <TextField
+            id={ 'poolType' }
+            name={ 'poolType' }
+            select
+            value={ poolType }
+            onChange={ this.onPoolTypeSelectChange }
+            SelectProps={{
+              native: false,
+              renderValue: (option) => {
+                return (
+                  <div className={ classes.assetSelectIconName }>
+                    <Typography variant='h4'>{ option }</Typography>
+                  </div>
+                )
+              }
+            }}
+            fullWidth
+            variant="outlined"
+            disabled={ loading }
+            className={ classes.actionInput }
+            placeholder={ 'Select' }
+          >
+            { poolTypes ? poolTypes.map((type) => { return this.renderPoolTypeOption(type) }) : null }
+          </TextField>
+        </div>
+      </div>
+    )
+  }
+
+  renderPoolTypeOption = (option) => {
+    const { classes } = this.props
+
+    return (
+      <MenuItem key={option} value={option} className={ classes.assetSelectMenu }>
+        <div className={ classes.assetSelectIconName }>
+          <Typography variant='h4'>{ option }</Typography>
+        </div>
+      </MenuItem>
+    )
+  }
+
   renderAssetInfo = () => {
-    const { assetInfo, selectedBasePool, name, symbol, fee, a } = this.state
+    const { assetInfo, selectedBasePool, name, symbol, selectedImplementation, poolType, assetInfo0, assetInfo1, assetInfo2, assetInfo3 } = this.state
     const { classes } = this.props
 
     /*
@@ -500,6 +738,10 @@ class AddPool extends Component {
         <Typography variant='h2' align='center' className={ classes.poolInfoHeader }>Your pool</Typography>
         <div className={ classes.assetInfoContainer }>
           <div className={ classes.assetField }>
+            <Typography variant='h3'>{ poolType }</Typography>
+            <Typography variant='h4' className={ classes.gray }>type</Typography>
+          </div>
+          <div className={ classes.assetField }>
             <Typography variant='h3'>{ name }</Typography>
             <Typography variant='h4' className={ classes.gray }>name</Typography>
           </div>
@@ -507,15 +749,38 @@ class AddPool extends Component {
             <Typography variant='h3'>{ symbol }</Typography>
             <Typography variant='h4' className={ classes.gray }>symbol</Typography>
           </div>
-
-          <div className={ classes.sepperator }></div>
-          { assetInfo && this.renderAsset(assetInfo) }
-          <Typography variant='h2' align='center'  className={ classes.poolInfoHeader }>+</Typography>
-          <div className={ classes.assetInfoContainerBase }>
-            { selectedBasePool.assets.map((asset) => {
-              return this.renderAssetBase(asset)
-            })}
+          <div className={ classes.assetField }>
+            <Typography variant='h3'>{ selectedImplementation.description }</Typography>
+            <Typography variant='h4' className={ classes.gray }>implementation</Typography>
           </div>
+          <div className={ classes.sepperator }></div>
+          {
+            poolType === 'Plain' &&
+            <>
+              { assetInfo0 && this.renderAsset(assetInfo0) }
+              <Typography variant='h2' align='center'  className={ classes.poolInfoHeader }>+</Typography>
+              { assetInfo1 && this.renderAsset(assetInfo1) }
+              <Typography variant='h2' align='center'  className={ classes.poolInfoHeader }>+</Typography>
+              { assetInfo2 && this.renderAsset(assetInfo2) }
+              <Typography variant='h2' align='center'  className={ classes.poolInfoHeader }>+</Typography>
+              { assetInfo3 && this.renderAsset(assetInfo3) }
+            </>
+          }
+          {
+            poolType === 'Metapool' &&
+            <>
+              { assetInfo && this.renderAsset(assetInfo) }
+              <Typography variant='h2' align='center'  className={ classes.poolInfoHeader }>+</Typography>
+              <div className={ classes.assetInfoContainerBase }>
+                { selectedBasePool.assets.map((asset) => {
+                  return this.renderAssetBase(asset)
+                })}
+              </div>
+            </>
+          }
+
+
+
         </div>
       </div>
     )
@@ -583,6 +848,7 @@ class AddPool extends Component {
     this.setState(val)
 
     this.setState({ assetInfo: null })
+
     if(event.target.value.length === 42) {
       this.setState({ loading: true })
       dispatcher.dispatch({ type: GET_ASSET_INFO, content: { address: event.target.value }})
@@ -604,18 +870,84 @@ class AddPool extends Component {
     })
   }
 
+  onAssetTypeSelectChange = (event) => {
+    let val = []
+    val[event.target.name] = event.target.value
+    this.setState(val)
+
+    const theImp = this.state.assetTypes.filter((imp) => {
+      return imp.index === event.target.value
+    })
+
+    //on change pool change assets as well
+    this.setState({
+      selectedAssetType: theImp[0]
+    })
+
+    if(event.target.value == 1) {
+      this.setState({
+        tokenAddress0: EEEEE_ADDRESS,
+        assetInfo0: {
+          address: EEEEE_ADDRESS,
+          symbol: 'ETH',
+          decimals: 18,
+          name: 'Ether',
+        }
+      })
+    }
+  }
+
+  onImplementationSelectChange = (event) => {
+    let val = []
+    val[event.target.name] = event.target.value
+    this.setState(val)
+
+    const theImp = this.state.implementations.filter((imp) => {
+      return imp.index === event.target.value
+    })
+
+    //on change pool change assets as well
+    this.setState({
+      selectedImplementation: theImp[0]
+    })
+  }
+
+  onPoolTypeSelectChange = (event) => {
+    let val = []
+    val[event.target.name] = event.target.value
+    this.setState(val)
+
+    if(event.target.value === 'Metapool') {
+      this.onImplementationSelectChange({ target: { name: 'implementation', value: 0 } })
+    }
+  }
+
   onAddPool = () => {
-    this.setState({ nameError: false, symbolError: false, aError: false, feeError: false })
+    this.setState({
+      nameError: false,
+      symbolError: false,
+      implementationError: false,
+      tokenAddressError: false,
+      tokenAddressError0: false,
+      tokenAddressError1: false,
+      tokenAddressError2: false,
+      tokenAddressError3: false,
+      selectedBasePoolError: false
+    })
 
     const {
       tokenAddress,
+      tokenAddress0,
+      tokenAddress1,
+      tokenAddress2,
+      tokenAddress3,
+      poolType,
       selectedBasePool,
       name,
       symbol,
-      a,
-      fee
+      selectedImplementation,
+      assetType
     } = this.state
-
     let error = false
 
     if(!name || name === '') {
@@ -628,19 +960,36 @@ class AddPool extends Component {
       error = true
     }
 
-    // if(!a || a === '') {
-    //   this.setState({ aError: true })
-    //   error = true
-    // }
-
-    if(!fee || fee === '') {
-      this.setState({ feeError: true })
+    if(!selectedImplementation || selectedImplementation === '') {
+      this.setState({ implementationError: true })
       error = true
     }
 
+    if(poolType === 'Metapool') {
+      if(!tokenAddress || tokenAddress === '') {
+        this.setState({ tokenAddressError: true })
+        error = true
+      }
+
+      if(!selectedBasePool || selectedBasePool === '') {
+        this.setState({ selectedBasePoolError: true })
+        error = true
+      }
+    } else if (poolType === 'Plain') {
+      if(!tokenAddress0 || tokenAddress0 === '') {
+        this.setState({ tokenAddress0Error: true })
+        error = true
+      }
+      if(!tokenAddress1 || tokenAddress1 === '') {
+        this.setState({ tokenAddress1Error: true })
+        error = true
+      }
+    }
+
+
     if(!error) {
       this.setState({ loading: true })
-      dispatcher.dispatch({ type: ADD_POOL, content: { basePool: selectedBasePool, address: tokenAddress, name, symbol, a, fee } })
+      dispatcher.dispatch({ type: ADD_POOL, content: { poolType, basePool: selectedBasePool, address: tokenAddress, tokenAddress0, tokenAddress1, tokenAddress2, tokenAddress3, name, symbol, implementationIndex: selectedImplementation.index, assetType: assetType } })
     }
   }
 }

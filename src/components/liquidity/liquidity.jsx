@@ -218,9 +218,10 @@ class Liquidity extends Component {
     const preSelectedPool = preSelectedPoolMatches === null ? null : preSelectedPoolMatches[1];
 
     let selectedPool = null
+    let v2PoolsArr = []
     if(pools && pools.length > 0) {
-      const v2PoolsArr = pools.filter((pool) => {
-        return pool.version === 2
+      v2PoolsArr = pools.filter((pool) => {
+        return pool.version === 3
       })
       if(v2PoolsArr.length > 0) {
         selectedPool = (
@@ -238,7 +239,7 @@ class Liquidity extends Component {
       selectedPool: selectedPool,
       poolAmount: '',
       poolAmountError: '',
-      loading: !(pools && pools.length > 0 && pools[0].assets.length > 0),
+      loading: !(v2PoolsArr && v2PoolsArr.length > 0 && v2PoolsArr[0].assets.length > 0),
       activeTab: 'deposit',
     }
 
@@ -274,7 +275,7 @@ class Liquidity extends Component {
     let selectedPool = null
     if(pools && pools.length > 0) {
       const v2PoolsArr = pools.filter((pool) => {
-        return pool.version === 2
+        return pool.version === 3
       })
       if(v2PoolsArr.length > 0) {
         selectedPool = v2PoolsArr[0]
@@ -471,7 +472,7 @@ class Liquidity extends Component {
     const { classes } = this.props
 
     return (
-      <MenuItem key={option.symbol} value={option.symbol} className={ classes.poolSelectOption }>
+      <MenuItem key={option.address} value={option.symbol} className={ classes.poolSelectOption }>
         <div>
           <Typography variant='h4'>{ option.name }</Typography>
           { option.balance > 0 ? <Typography variant='h5' className={ classes.gray }>Bal: { option.balance ? parseFloat(option.balance).toFixed(4) : '' }</Typography> : '' }
@@ -516,9 +517,9 @@ class Liquidity extends Component {
             disabled={ loading }
             className={ classes.actionInput }
             placeholder={ 'Select' }
-            helperText={ 'Deposits are closed for V1 pools' }
+            helperText={ 'Deposits are closed for V1 and V2 pools' }
           >
-            { pools ? pools.filter((pool) => { return pool.version === 2; }).map((pool) => { return this.renderPoolOption(pool) }) : null }
+            { pools ? pools.filter((pool) => { return pool.version === 3; }).map((pool) => { return this.renderPoolOption(pool) }) : null }
           </TextField>
         </div>
       </div>
@@ -529,7 +530,7 @@ class Liquidity extends Component {
     const { classes } = this.props
 
     return (
-      <MenuItem key={option.symbol} value={option.symbol} className={ classes.assetSelectMenu }>
+      <MenuItem key={option.address} value={option.symbol} className={ classes.assetSelectMenu }>
         <React.Fragment>
           <div className={ classes.poolSelectOption }>
             <div className={ classes.assetSelectIcon }>
@@ -753,7 +754,10 @@ class Liquidity extends Component {
     }
 
     this.setState(newStateSlice);
-    this.getDepositAmount(newStateSlice);
+
+    if(this.state.activeTab === 'deposit') {
+      this.getDepositAmount(newStateSlice);
+    }
   }
 
   setAmount = (symbol, balance) => {
@@ -762,7 +766,10 @@ class Liquidity extends Component {
     };
 
     this.setState(newStateSlice);
-    this.getDepositAmount(newStateSlice);
+
+    if(this.state.activeTab === 'deposit') {
+      this.getDepositAmount(newStateSlice);
+    }
   }
 
   toggleDeposit = () => {
@@ -786,7 +793,7 @@ class Liquidity extends Component {
 
       if(pools && pools.length > 0) {
         const v2PoolsArr = pools.filter((pool) => {
-          return pool.version === 2
+          return pool.version === 3
         })
         if(v2PoolsArr.length > 0) {
           selectedPool = v2PoolsArr[0]
