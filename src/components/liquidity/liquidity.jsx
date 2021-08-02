@@ -473,7 +473,7 @@ class Liquidity extends Component {
     const { classes } = this.props
 
     return (
-      <MenuItem key={option.address} value={option.symbol} className={ classes.poolSelectOption }>
+      <MenuItem key={option.address} value={option.id} className={ classes.poolSelectOption }>
         <div>
           <Typography variant='h4'>{ option.name }</Typography>
           { option.balance > 0 ? <Typography variant='h5' className={ classes.gray }>Bal: { option.balance ? parseFloat(option.balance).toFixed(4) : '' }</Typography> : '' }
@@ -531,7 +531,7 @@ class Liquidity extends Component {
     const { classes } = this.props
 
     return (
-      <MenuItem key={option.address} value={option.symbol} className={ classes.assetSelectMenu }>
+      <MenuItem key={option.address} value={option.id} className={ classes.assetSelectMenu }>
         <React.Fragment>
           <div className={ classes.poolSelectOption }>
             <div className={ classes.assetSelectIcon }>
@@ -733,6 +733,8 @@ class Liquidity extends Component {
     const selectedPool = this.state.pools.find((pool) => {
       return pool.id === event.target.value
     })
+
+    console.log(selectedPool)
 
     const newStateSlice = {
       [event.target.name]: event.target.value,

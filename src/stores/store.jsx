@@ -329,7 +329,9 @@ class Store {
       poolsV1 = []
     }
 
-    const pools = [...poolsV3, ...poolsV2, ...poolsV1]
+    const pools = [...poolsV3, ...poolsV2, ...poolsV1].filter((pool) => {
+      return pool.address.toLowerCase() != '0x1F71f05CF491595652378Fe94B7820344A551B8E'.toLowerCase()
+    })
 
     async.map(pools, (pool, callback) => {
       this._getPoolData(web3, pool, account, callback)
